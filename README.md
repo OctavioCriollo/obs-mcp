@@ -120,8 +120,15 @@ The server provides tools organized by category:
 
 ## Environment Variables
 
-- `OBS_WEBSOCKET_URL`: WebSocket URL (default: ws://localhost:4455)
+- `OBS_WEBSOCKET_URL`: WebSocket URL (default: `ws://localhost:4455`)
 - `OBS_WEBSOCKET_PASSWORD`: Password for authenticating with OBS WebSocket (if required)
+- `OBS_EXECUTABLE_PATH` *(added in this fork)*: Absolute path to the OBS executable.
+  Only needed when `obs-launch` cannot auto-detect OBS — e.g. non-standard installs
+  (portable, custom drive), some Chocolatey/Scoop layouts, or MSIX Store packages.
+  When set, this overrides all auto-detection. Examples:
+  - Windows: `D:\Apps\obs-studio\bin\64bit\obs64.exe`
+  - macOS: `/Volumes/MyDrive/OBS.app/Contents/MacOS/OBS`
+  - Linux: `/opt/obs-studio/bin/obs`
 
 ## Requirements
 

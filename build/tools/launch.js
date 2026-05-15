@@ -20,20 +20,83 @@ let lastLaunchedProcess = null;
  * Search common install locations for the OBS Studio executable.
  * Returns the absolute path of the first match or null.
  */
+/**
+ * Locate the OBS Studio executable in a portable way.
+ *
+ * Lookup order (most specific to most generic):
+ *   1. `OBS_EXECUTABLE_PATH` env var — explicit user override (for non-standard
+ *      installs: Chocolatey, Scoop, MSIX Store, portable, custom drive, etc.).
+ *   2. PATH lookup via `where.exe` (Windows) / `which` (Unix) — works if OBS
+ *      is on PATH regardless of where it lives.
+ *   3. Standard install locations per OS — covers the official installer.
+ *      Uses environment variables (e.g. `%ProgramFiles%`) so it adapts to
+ *      Windows in non-English locales (e.g. `C:\Archivos de programa`).
+ *
+ * Returns the absolute path of the first match, or null if none found.
+ */
 function findObsExecutable() {
+    // 1. Explicit override
+    const override = process.env.OBS_EXECUTABLE_PATH;
+    if (override && existsSync(override)) {
+        return override;
+    }
+    if (override && !existsSync(override)) {
+        // Override set but invalid — surface a clear error path rather than
+        // silently falling back, so the user can fix the typo.
+        throw new Error(`OBS_EXECUTABLE_PATH is set to "${override}" but no such file exists. ` +
+            `Either correct the path or unset the variable to use auto-detection.`);
+    }
+    // 2. PATH lookup
+    try {
+        const lookupCmd = process.platform === "win32" ? "where obs64" : "which obs";
+        const found = execSync(lookupCmd, { encoding: "utf8", windowsHide: true })
+            .split(/\r?\n/)
+            .map(s => s.trim())
+            .find(s => s.length > 0 && existsSync(s));
+        if (found) {
+            return found;
+        }
+    }
+    catch {
+        // not on PATH — fall through to standard locations
+    }
+    // 3. Standard install locations per OS
     const candidates = [];
     if (process.platform === "win32") {
+        // Use env vars so this works on localized Windows (e.g. Spanish: "Archivos de programa")
+        // Fall back to common English paths only if the env var is missing.
         const programFiles = process.env["ProgramFiles"] || "C:\\Program Files";
         const programFilesX86 = process.env["ProgramFiles(x86)"] || "C:\\Program Files (x86)";
+        const localAppData = process.env["LOCALAPPDATA"];
         candidates.push(path.join(programFiles, "obs-studio", "bin", "64bit", "obs64.exe"));
         candidates.push(path.join(programFilesX86, "obs-studio", "bin", "64bit", "obs64.exe"));
+        // Scoop default install path
+        if (process.env["USERPROFILE"]) {
+            candidates.push(path.join(process.env["USERPROFILE"], "scoop", "apps", "obs-studio", "current", "bin", "64bit", "obs64.exe"));
+        }
+        // Chocolatey default install path
+        candidates.push("C:\\ProgramData\\chocolatey\\lib\\obs-studio\\tools\\obs-studio\\bin\\64bit\\obs64.exe");
+        // MSIX Store install (the OBS Store package, not the user's TradingView pattern).
+        // Path varies by package version, so this is best-effort.
+        if (localAppData) {
+            // Some MSIX builds expose obs via the user's WindowsApps mirror, but those are
+            // sandboxed and typically not runnable as plain executables. Documented for completeness.
+        }
     }
     else if (process.platform === "darwin") {
         candidates.push("/Applications/OBS.app/Contents/MacOS/OBS");
+        if (process.env["HOME"]) {
+            candidates.push(path.join(process.env["HOME"], "Applications", "OBS.app", "Contents", "MacOS", "OBS"));
+        }
     }
     else {
-        // Linux: common locations / PATH lookup
+        // Linux: standard package manager locations + Flatpak / Snap.
         candidates.push("/usr/bin/obs", "/usr/local/bin/obs", "/snap/bin/obs");
+        // Flatpak typically exposes a wrapper script
+        candidates.push("/var/lib/flatpak/exports/bin/com.obsproject.Studio");
+        if (process.env["HOME"]) {
+            candidates.push(path.join(process.env["HOME"], ".local", "share", "flatpak", "exports", "bin", "com.obsproject.Studio"));
+        }
     }
     for (const candidate of candidates) {
         if (existsSync(candidate)) {
@@ -140,7 +203,25 @@ export async function initialize(server, client) {
             }
         }
         // Case 2: OBS not running — find executable and spawn it.
-        const exe = findObsExecutable();
+        let exe;
+        try {
+            exe = findObsExecutable();
+        }
+        catch (error) {
+            // findObsExecutable throws when OBS_EXECUTABLE_PATH is set but invalid.
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: JSON.stringify({
+                            success: false,
+                            error: error instanceof Error ? error.message : String(error),
+                        }, null, 2),
+                    },
+                ],
+                isError: true,
+            };
+        }
         if (!exe) {
             return {
                 content: [
@@ -148,7 +229,9 @@ export async function initialize(server, client) {
                         type: "text",
                         text: JSON.stringify({
                             success: false,
-                            error: "OBS Studio executable not found in standard locations. Install OBS from https://obsproject.com/ or set the executable path manually.",
+                            error: "OBS Studio executable not found in standard locations or on PATH. " +
+                                "Install OBS from https://obsproject.com/, OR set the OBS_EXECUTABLE_PATH " +
+                                "environment variable to the full path of obs64.exe / OBS / obs.",
                         }, null, 2),
                     },
                 ],
