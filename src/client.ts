@@ -175,6 +175,41 @@ export class OBSWebSocketClient extends EventEmitter {
   }
 
   /**
+   * Check if the client is fully connected and identified with OBS.
+   * Use this for non-throwing state checks (e.g. obs-health-check).
+   */
+  public isConnected(): boolean {
+    return this.connected && this.identified;
+  }
+
+  /**
+   * Ensure the client is connected. If not, attempts to connect on demand
+   * and throws a clear, actionable error if connection fails.
+   *
+   * This is the entry point that makes the MCP "lazy connect": every tool
+   * call goes through sendRequest() which calls ensureConnected() first.
+   * If OBS is not running, the user gets a helpful error message instead
+   * of a process crash.
+   */
+  public async ensureConnected(): Promise<void> {
+    if (this.connected && this.identified) {
+      return;
+    }
+    try {
+      await this.connect();
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Cannot connect to OBS WebSocket at ${this.url}. ` +
+        `Make sure OBS Studio is running with the WebSocket server enabled ` +
+        `(Tools > WebSocket Server Settings). ` +
+        `Tip: call the "obs-launch" tool to start OBS automatically. ` +
+        `Underlying error: ${detail}`
+      );
+    }
+  }
+
+  /**
    * Disconnect from the OBS WebSocket server
    */
   public disconnect(): void {
@@ -190,6 +225,9 @@ export class OBSWebSocketClient extends EventEmitter {
    * Send a request to the OBS WebSocket server
    */
   public async sendRequest<T = any>(requestType: string, requestData?: any, timeout: number = 10000): Promise<T> {
+    // Lazy connect: if not connected yet, try to connect now.
+    // If OBS is not running this will throw a clear error, captured by the tool's try/catch.
+    await this.ensureConnected();
     if (!this.ws || !this.connected || !this.identified) {
       throw new Error('Not connected or identified with OBS WebSocket server');
     }

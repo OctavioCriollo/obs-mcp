@@ -1,6 +1,42 @@
-# OBS MCP Server
+# OBS MCP Server — Lazy Connect + Auto-Launch Fork
+
+> **Fork of [zeke/obs-mcp](https://github.com/zeke/obs-mcp)** with two operational improvements that make the MCP usable without having OBS already running.
 
 An MCP server for OBS Studio that provides tools to control OBS via the OBS WebSocket protocol.
+
+## What this fork adds (vs upstream)
+
+The upstream `obs-mcp` connects to OBS WebSocket eagerly at startup. If OBS is not running, the process crashes with `WebSocket error` and the MCP shows as `failed` in Claude Desktop / Claude Code. This fork fixes that:
+
+1. **Lazy connect.** The MCP loads cleanly even when OBS Studio is closed. The WebSocket connection happens automatically the first time a tool is invoked.
+2. **`obs-launch` tool.** Inspired by TradingView MCP's `tv_launch`: auto-detects the OBS executable on Windows / macOS / Linux, spawns it detached, waits for the WebSocket port to open, then connects. You can ask the LLM "launch OBS" and the MCP handles everything.
+3. **`obs-health-check` tool.** Non-throwing state report (process running? port open? identified?) — safe to call any time.
+4. **`obs-close` tool.** Disconnect the MCP client without killing OBS itself.
+
+The 120+ original tools are unchanged and now also work on-demand (auto-connect via `client.ensureConnected()`).
+
+### Configuration with this fork
+
+```json
+{
+  "mcpServers": {
+    "obs": {
+      "command": "npx",
+      "args": ["-y", "github:OctavioCriollo/obs-mcp"],
+      "env": {
+        "OBS_WEBSOCKET_PASSWORD": "<password_from_obs>"
+      }
+    }
+  }
+}
+```
+
+The compiled `build/` folder is tracked in git so `npx github:` runs the prebuilt JavaScript without needing a TypeScript compile step on the consumer's machine.
+
+---
+
+## Upstream documentation (unchanged)
+
 
 ## Features
 
@@ -74,6 +110,7 @@ Then configure Claude desktop:
 
 The server provides tools organized by category:
 
+- **Lifecycle tools (added in this fork):** `obs-launch`, `obs-health-check`, `obs-close`
 - General tools: Version info, stats, hotkeys, studio mode
 - Scene tools: List scenes, switch scenes, create/remove scenes
 - Source tools: Manage sources, settings, audio levels, mute/unmute

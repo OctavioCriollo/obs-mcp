@@ -16,6 +16,7 @@ import * as mediaInputs from "./media-inputs.js";
 import * as outputs from "./outputs.js";
 import * as record from "./record.js";
 import * as ui from "./ui.js";
+import * as launch from "./launch.js";
 
 // Export the initialization function for all tools
 export async function initialize(server: McpServer, client: OBSWebSocketClient): Promise<void> {
@@ -33,17 +34,18 @@ export async function initialize(server: McpServer, client: OBSWebSocketClient):
     mediaInputs.initialize(server, client),
     outputs.initialize(server, client),
     record.initialize(server, client),
-    ui.initialize(server, client)
+    ui.initialize(server, client),
+    launch.initialize(server, client)
   ]);
 }
 
 // Export tool modules
-export { 
-  general, 
-  scenes, 
-  sources, 
-  sceneItems, 
-  streaming, 
+export {
+  general,
+  scenes,
+  sources,
+  sceneItems,
+  streaming,
   transitions,
   config,
   filters,
@@ -51,5 +53,6 @@ export {
   mediaInputs,
   outputs,
   record,
-  ui
+  ui,
+  launch
 };

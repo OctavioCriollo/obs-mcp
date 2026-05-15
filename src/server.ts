@@ -38,10 +38,10 @@ export async function startServer() {
 
     serverConnected = true;
 
-    // Connect to OBS WebSocket
-    logger.log("Connecting to OBS WebSocket...");
-    await obsClient.connect();
-    logger.log("Connected to OBS WebSocket server");
+    // OBS WebSocket connection is LAZY — it happens automatically the first time
+    // a tool calls client.sendRequest(). This means the MCP loads cleanly even when
+    // OBS Studio is not running. Use the obs-launch tool to start OBS on demand.
+    logger.log("OBS MCP ready (OBS WebSocket connection deferred)");
 
     // Set up graceful shutdown
     process.on("SIGINT", handleShutdown);

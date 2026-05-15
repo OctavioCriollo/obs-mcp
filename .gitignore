@@ -2,7 +2,9 @@
 node_modules/
 
 # Build output
-build/
+# NOTE: build/ is intentionally tracked so that `npx github:OctavioCriollo/obs-mcp`
+# can execute the compiled code directly without requiring a TypeScript build step
+# on the consumer's machine. Keep build/ in sync with src/ when committing.
 dist/
 
 # Environment variables
